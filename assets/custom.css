@@ -1,0 +1,160 @@
+/* BJK University — Webinar Analytics Dashboard — Custom Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+    --bg-primary: #0A0A10;
+    --bg-card: #13131E;
+    --bg-card-hover: #1A1A2E;
+    --accent-gold: #F59E0B;
+    --accent-blue: #3B82F6;
+    --color-organic: #22C55E;
+    --color-paid: #F59E0B;
+    --color-unknown: #6B7280;
+    --text-primary: #F0F0FC;
+    --text-muted: #8888A8;
+    --grid-line: #1E1E30;
+    --border-subtle: #1E1E30;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    margin: 0; padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+.header-bar {
+    background: linear-gradient(135deg, #0D0D1A 0%, #13131E 100%);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 18px 32px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+}
+.header-left h1 {
+    font-size: 22px; font-weight: 800; color: var(--text-primary);
+    margin: 0; letter-spacing: -0.5px;
+}
+.header-left h1 span { color: var(--accent-gold); }
+.header-left p {
+    font-size: 13px; color: var(--text-muted); margin: 4px 0 0 0;
+    font-weight: 400;
+}
+.header-right {
+    font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 16px;
+}
+.live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-organic); display: inline-block;
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--color-organic);
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Stat Cards */
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 20px 24px;
+    position: relative; overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow);
+}
+.stat-card:hover {
+    border-color: rgba(245,158,11,0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.stat-card .accent-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; border-radius: 12px 12px 0 0;
+}
+.stat-card .label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 8px;
+}
+.stat-card .value {
+    font-size: 36px; font-weight: 800; line-height: 1; letter-spacing: -1px;
+}
+.stat-card .sub {
+    font-size: 12px; color: var(--text-muted); margin-top: 6px; font-weight: 400;
+}
+
+/* Chart containers */
+.chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.3s ease;
+}
+.chart-card:hover { border-color: rgba(245,158,11,0.2); }
+.chart-card h3 {
+    font-size: 15px; font-weight: 700; color: var(--text-primary);
+    margin: 0 0 16px 0; letter-spacing: -0.3px;
+}
+.chart-card h3 span { color: var(--accent-gold); font-weight: 400; font-size: 13px; }
+
+/* Data Table */
+.dash-table-container {
+    border-radius: 12px; overflow: hidden;
+}
+.dash-spreadsheet-container .dash-spreadsheet-inner th {
+    background-color: #1A1A2E !important;
+    color: var(--text-muted) !important;
+    font-size: 11px !important; font-weight: 600 !important;
+    text-transform: uppercase !important; letter-spacing: 0.8px !important;
+    border-bottom: 2px solid var(--accent-gold) !important;
+    padding: 12px 16px !important;
+}
+.dash-spreadsheet-container .dash-spreadsheet-inner td {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    padding: 10px 16px !important;
+}
+.dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td {
+    background-color: var(--bg-card-hover) !important;
+}
+.previous-next-container { color: var(--text-muted) !important; }
+.previous-next-container button {
+    color: var(--accent-gold) !important;
+    background: transparent !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 6px !important; padding: 6px 12px !important;
+}
+.page-number { color: var(--text-primary) !important; }
+
+/* Footer */
+.footer-bar {
+    text-align: center; padding: 24px;
+    font-size: 12px; color: var(--text-muted);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 32px;
+}
+
+/* Section label */
+.section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--text-muted);
+    margin: 32px 0 16px 0; padding-left: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header-bar { padding: 14px 16px; }
+    .header-left h1 { font-size: 18px; }
+    .stat-card .value { font-size: 28px; }
+    .chart-card { padding: 16px; }
+}
