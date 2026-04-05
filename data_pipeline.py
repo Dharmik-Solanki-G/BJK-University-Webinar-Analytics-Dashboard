@@ -91,9 +91,7 @@ def build_master_dataframe(data, metadata):
     def classify_source(email):
         if email in paid_emails:
             return 'Paid'
-        if email in organic_emails:
-            return 'Organic'
-        return 'Unknown'
+        return 'Organic'
 
     master['source'] = master['email'].apply(classify_source)
 
@@ -108,14 +106,7 @@ def build_master_dataframe(data, metadata):
 
     # ── 5. Engagement percentage ──────────────────────────────────
     webinar_duration = metadata.get('actual_duration', 209)
-    # Also compute from top quartile of attendees
-    attended_durations = master.loc[master['attended'], 'duration_minutes']
-    if len(attended_durations) > 10:
-        top_q = attended_durations.quantile(0.75)
-        median_top = attended_durations[attended_durations >= top_q].median()
-        if median_top and median_top > 30:
-            webinar_duration = median_top
-            logger.info(f"Webinar duration estimated from top quartile: {webinar_duration:.0f} min")
+    # Also compute from top quartile of attendees (REMOVED: always use exact webinar duration)
     master['engagement_pct'] = (master['duration_minutes'] / webinar_duration * 100).clip(0, 100).round(1)
 
     # ── 6. Booked call flag and images ────────────────────────────

@@ -158,3 +158,14 @@ body {
     .stat-card .value { font-size: 28px; }
     .chart-card { padding: 16px; }
 }
+
+/* Insight Bar */
+.insight-bar {
+    background: #1C1400;
+    border: 1px solid #713F12;
+    border-left: 4px solid #F59E0B;
+    border-radius: 6px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}

@@ -22,7 +22,7 @@ def funnel_metrics(master):
 def source_metrics(master):
     """Per-source breakdown of registration, attendance, show rate, engagement."""
     results = {}
-    for src in ['Organic', 'Paid', 'Unknown']:
+    for src in ['Organic', 'Paid']:
         subset = master[master['source'] == src]
         attended = subset[subset['attended']]
         reg = len(subset)
@@ -66,7 +66,7 @@ def engagement_distribution(master):
     labels = ['0-25%', '26-50%', '51-75%', '76-100%']
     attended['band'] = pd.cut(attended['engagement_pct'], bins=bins, labels=labels, include_lowest=True)
     pivot = attended.groupby(['band', 'source'], observed=False).size().unstack(fill_value=0)
-    for src in ['Organic', 'Paid', 'Unknown']:
+    for src in ['Organic', 'Paid']:
         if src not in pivot.columns:
             pivot[src] = 0
     return pivot.reset_index()
@@ -79,7 +79,7 @@ def registration_timeline(master):
     df = master.dropna(subset=['registration_time']).copy()
     df['reg_date'] = df['registration_time'].dt.date
     pivot = df.groupby(['reg_date', 'source']).size().unstack(fill_value=0)
-    for src in ['Organic', 'Paid', 'Unknown']:
+    for src in ['Organic', 'Paid']:
         if src not in pivot.columns:
             pivot[src] = 0
     pivot = pivot.reset_index()
@@ -87,27 +87,26 @@ def registration_timeline(master):
     return pivot.sort_values('reg_date')
 
 
-def booked_calls_metrics(master, total_booked):
+def booked_calls_metrics(master):
     """Booked call conversion metrics."""
     attended = master['attended'].sum()
     booked_matched = master['booked_call'].sum()
     return {
-        'total_booked': int(total_booked),
+        'total_booked': int(booked_matched),
         'matched_booked': int(booked_matched),
-        'booking_rate': round(total_booked / attended * 100, 1) if attended > 0 else 0,
+        'booking_rate': round(booked_matched / attended * 100, 1) if attended > 0 else 0,
     }
 
 
 def compute_all(master, metadata):
     """Compute all metrics at once."""
-    total_booked = metadata.get('total_booked_calls', 34)
     return {
         'funnel': funnel_metrics(master),
         'source': source_metrics(master),
         'platform': platform_metrics(master),
         'engagement': engagement_distribution(master),
         'timeline': registration_timeline(master),
-        'booked': booked_calls_metrics(master, total_booked),
+        'booked': booked_calls_metrics(master),
         'webinar_duration': metadata.get('actual_duration', 209),
         'unique_viewers': metadata.get('unique_viewers', 0),
         'max_concurrent': metadata.get('max_concurrent', 0),

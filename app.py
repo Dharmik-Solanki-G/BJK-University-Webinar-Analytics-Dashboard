@@ -28,7 +28,7 @@ GRAY = '#6B7280'
 TEXT = '#F0F0FC'
 MUTED = '#8888A8'
 GRID = '#1E1E30'
-SRC_COLORS = {'Organic': GREEN, 'Paid': GOLD, 'Unknown': GRAY}
+SRC_COLORS = {'Organic': GREEN, 'Paid': GOLD}
 
 PLOT_LAYOUT = dict(
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
@@ -61,12 +61,12 @@ def mask_email(e):
 def fig_funnel_bars():
     """Grouped bar: Registrations vs Attendance by Source."""
     src = M['source']
-    sources = ['Organic', 'Paid', 'Unknown']
+    sources = ['Organic', 'Paid']
     regs = [src[s]['registered'] for s in sources]
     atts = [src[s]['attended'] for s in sources]
     rates = [f"{src[s]['show_rate']}%" for s in sources]
-    colors_reg = ['rgba(34,197,94,0.3)', 'rgba(245,158,11,0.3)', 'rgba(107,114,128,0.3)']
-    colors_att = [GREEN, GOLD, GRAY]
+    colors_reg = ['rgba(34,197,94,0.3)', 'rgba(245,158,11,0.3)']
+    colors_att = [GREEN, GOLD]
     fig = go.Figure()
     fig.add_trace(go.Bar(name='Registered', x=sources, y=regs, marker_color=colors_reg,
                          marker_line=dict(width=1, color=colors_att), text=regs, textposition='outside',
@@ -85,9 +85,9 @@ def fig_funnel_bars():
 def fig_reg_donut():
     """Donut: Registration split by source."""
     src = M['source']
-    labels = ['Organic', 'Paid', 'Unknown']
+    labels = ['Organic', 'Paid']
     values = [src[s]['registered'] for s in labels]
-    colors = [GREEN, GOLD, GRAY]
+    colors = [GREEN, GOLD]
     fig = go.Figure(go.Pie(
         labels=labels, values=values, hole=0.65,
         marker=dict(colors=colors, line=dict(color=BG, width=2)),
@@ -104,7 +104,7 @@ def fig_reg_donut():
 def fig_showup_bars():
     """Horizontal bars: Show-up rate by source."""
     src = M['source']
-    sources = ['Unknown', 'Paid', 'Organic']
+    sources = ['Paid', 'Organic']
     rates = [src[s]['show_rate'] for s in sources]
     colors = [SRC_COLORS[s] for s in sources]
     fig = go.Figure(go.Bar(
@@ -122,15 +122,15 @@ def fig_showup_bars():
 def fig_noshow():
     """Stacked bar: Attended vs No-Show by source."""
     src = M['source']
-    sources = ['Organic', 'Paid', 'Unknown']
+    sources = ['Organic', 'Paid']
     attended = [src[s]['attended'] for s in sources]
     noshow = [src[s]['no_show'] for s in sources]
     fig = go.Figure()
     fig.add_trace(go.Bar(name='Attended', x=sources, y=attended,
-                         marker_color=[GREEN, GOLD, GRAY],
+                         marker_color=[GREEN, GOLD],
                          text=attended, textposition='inside', textfont=dict(size=12, color='#000')))
     fig.add_trace(go.Bar(name='No-Show', x=sources, y=noshow,
-                         marker_color=['rgba(34,197,94,0.25)', 'rgba(245,158,11,0.25)', 'rgba(107,114,128,0.25)'],
+                         marker_color=['rgba(34,197,94,0.25)', 'rgba(245,158,11,0.25)'],
                          text=noshow, textposition='inside', textfont=dict(size=12, color=TEXT)))
     fig.update_layout(**PLOT_LAYOUT)
     fig.update_layout(barmode='stack', title=None,
@@ -144,7 +144,7 @@ def fig_engagement():
     if eng.empty:
         return go.Figure().update_layout(**PLOT_LAYOUT)
     fig = go.Figure()
-    for src, color in [('Organic', GREEN), ('Paid', GOLD), ('Unknown', GRAY)]:
+    for src, color in [('Organic', GREEN), ('Paid', GOLD)]:
         if src in eng.columns:
             fig.add_trace(go.Bar(name=src, x=eng['band'], y=eng[src],
                                  marker_color=color, text=eng[src], textposition='outside',
@@ -162,7 +162,7 @@ def fig_timeline():
     if tl.empty:
         return go.Figure().update_layout(**PLOT_LAYOUT)
     fig = go.Figure()
-    for src, color in [('Organic', GREEN), ('Paid', GOLD), ('Unknown', GRAY)]:
+    for src, color in [('Organic', GREEN), ('Paid', GOLD)]:
         if src in tl.columns:
             fig.add_trace(go.Scatter(
                 x=tl['reg_date'], y=tl[src], name=src, mode='lines',
@@ -174,6 +174,7 @@ def fig_timeline():
                       xaxis_title='Registration Date', yaxis_title='Registrations',
                       legend=dict(orientation='h', y=-0.2, x=0.5, xanchor='center'),
                       hovermode='x unified')
+    fig.update_xaxes(tickformat='%b %d')
     return fig
 
 
@@ -203,10 +204,30 @@ table_df['booked_label'] = table_df['booked_call'].map({True: '📞 YES', False:
 table_df['screenshot_button'] = table_df['booked_call'].map({True: '📷 View', False: ''})
 table_df['screenshot_filename'] = master['screenshot_filename']
 
+webinar_duration = M['webinar_duration']
+def format_engagement(row):
+    if row['duration_minutes'] > webinar_duration:
+        return "100%+"
+    return f"{row['engagement_pct']}%"
+table_df['engagement_display'] = table_df.apply(format_engagement, axis=1)
+
 f = M['funnel']
 s = M['source']
 b = M['booked']
 now = datetime.now().strftime('%B %d, %Y at %I:%M %p')
+
+paid_sr = s['Paid']['show_rate']
+org_sr = s['Organic']['show_rate']
+diff_pct = round((paid_sr - org_sr) / org_sr * 100) if org_sr > 0 else 0
+direction = "more likely" if diff_pct > 0 else "less likely"
+insight_text = (
+    f"Paid traffic drove {s['Paid']['registered']} registrations "
+    f"({round(s['Paid']['registered']/f['total_registered']*100)}% of total) "
+    f"but delivered a {paid_sr}% show rate vs {org_sr}% for organic — "
+    f"meaning paid leads are ~{abs(diff_pct)}% {direction} to show up. "
+    f"Of the {f['total_attended']} who attended, "
+    f"{b['total_booked']} booked a call ({b['booking_rate']}% conversion)."
+)
 
 app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, children=[
 
@@ -254,8 +275,20 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
             dbc.Col(stat_card('Avg Duration (Paid)', f"{s['Paid']['avg_duration']} min", GOLD,
                               f"{s['Paid']['avg_engagement']}% engagement"), md=3),
             dbc.Col(stat_card('Peak Concurrent', f"{M['max_concurrent']}", BLUE,
-                              f"{M['webinar_duration']} min runtime"), md=3),
+                              f"per Zoom report — {M['webinar_duration']} min runtime"), md=3),
         ], className='g-3 mb-4'),
+
+        html.Div(className='insight-bar', children=[
+            html.Span("KEY INSIGHT  ", style={
+                'color': GOLD,
+                'fontWeight': 700,
+                'fontSize': '11px'
+            }),
+            html.Span(insight_text, style={
+                'color': TEXT,
+                'fontSize': '13px'
+            }),
+        ]),
 
         # Section: Funnel Analysis
         html.Div('Funnel Analysis', className='section-label'),
@@ -314,7 +347,7 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
                     {'name': 'Source', 'id': 'source'},
                     {'name': 'Attended', 'id': 'attended_label'},
                     {'name': 'Duration (min)', 'id': 'duration_minutes', 'type': 'numeric'},
-                    {'name': 'Engagement %', 'id': 'engagement_pct', 'type': 'numeric'},
+                    {'name': 'Engagement %', 'id': 'engagement_display'},
                     {'name': 'Platform', 'id': 'ad_platform'},
                     {'name': 'Booked Call', 'id': 'booked_label'},
                     {'name': 'Pictures', 'id': 'screenshot_button'},
@@ -344,8 +377,6 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
                      'color': GREEN, 'fontWeight': '600'},
                     {'if': {'filter_query': '{source} = "Paid"', 'column_id': 'source'},
                      'color': GOLD, 'fontWeight': '600'},
-                    {'if': {'filter_query': '{source} = "Unknown"', 'column_id': 'source'},
-                     'color': GRAY, 'fontWeight': '600'},
                     {'if': {'column_id': 'screenshot_button', 'filter_query': '{screenshot_button} != ""'},
                      'color': '#3B82F6', 'cursor': 'pointer', 'textDecoration': 'underline', 'fontWeight': 'bold'},
                 ],
