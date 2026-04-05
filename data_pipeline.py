@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ATTENDANCE_MIN_MINUTES = 5
+ATTENDANCE_MIN_MINUTES = 0
 
 
 def classify_ad_platform(row):
@@ -111,12 +111,41 @@ def build_master_dataframe(data, metadata):
 
     # ── 6. Booked call flag and images ────────────────────────────
     if not booked.empty:
-        booked_dict = dict(zip(booked['email'], booked['filename']))
-        master['booked_call'] = master['email'].isin(booked_dict)
-        master['screenshot_filename'] = master['email'].map(booked_dict)
+        # Create a dictionary for mapping filenames and dates
+        booked_info_dict = booked.set_index('email')[['filename', 'date']].to_dict('index')
+        master['booked_call'] = master['email'].isin(booked_info_dict)
+        master['screenshot_filename'] = master['email'].apply(lambda x: booked_info_dict[x]['filename'] if x in booked_info_dict else None)
+        master['booking_date'] = master['email'].apply(lambda x: pd.to_datetime(booked_info_dict[x]['date']).date() if x in booked_info_dict else None)
+
+        # Ensure all booked callers are in master (some might not have registered/attended)
+        booked_emails = set(booked['email'])
+        master_emails = set(master['email'])
+        missing_booked = booked_emails - master_emails
+        
+        master['is_booked_only'] = False  # Initialize for existing rows
+        
+        if missing_booked:
+            missing_info = booked[booked['email'].isin(missing_booked)].copy()
+            new_rows = pd.DataFrame({
+                'email': missing_info['email'].values,
+                'name': missing_info['name'].values,
+                'attended': False,
+                'attended_raw': False,
+                'duration_minutes': 0,
+                'booked_call': True,
+                'screenshot_filename': missing_info['filename'].values,
+                'booking_date': pd.to_datetime(missing_info['date']).dt.date,
+                'source': missing_info['email'].apply(classify_source),
+                'engagement_pct': 0.0,
+                'ad_platform': '',
+                'is_booked_only': True,
+            })
+            master = pd.concat([master, new_rows], ignore_index=True)
+            logger.info(f"Added {len(new_rows)} booked callers who were not in registrant/attendee lists")
     else:
         master['booked_call'] = False
         master['screenshot_filename'] = None
+        master['is_booked_only'] = False
 
     # ── 7. Fill UTM columns ───────────────────────────────────────
     for c in ['lead_utm_source', 'lead_utm_medium', 'lead_utm_campaign', 'lead_utm_term', 'lead_utm_content']:
@@ -125,8 +154,17 @@ def build_master_dataframe(data, metadata):
         else:
             master[c] = ''
 
-    # ── 8. Clean up ───────────────────────────────────────────────
-    master = master.drop_duplicates(subset='email', keep='first').reset_index(drop=True)
+    # ── 7. Registration Status ────────────────────────────────────
+    def get_reg_status(row):
+        if row.get('is_booked_only', False):
+            return 'Booked Only'
+        if row['attended']:
+            return 'Attended'
+        return 'No-Show'
+
+    master['reg_status'] = master.apply(get_reg_status, axis=1)
+
+    # ── 8. Ad platform classification (for paid leads) ────────────
 
     src_counts = master['source'].value_counts().to_dict()
     att_counts = master[master['attended']]['source'].value_counts().to_dict()

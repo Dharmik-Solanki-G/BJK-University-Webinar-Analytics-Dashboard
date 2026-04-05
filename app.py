@@ -7,6 +7,7 @@ from dash import html, dcc, dash_table, callback, Output, Input, State, no_updat
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import plotly.express as px
+import pandas as pd
 from datetime import datetime
 
 from data_loader import load_all
@@ -50,6 +51,20 @@ def stat_card(label, value, color, sub=''):
     ])
 
 
+def multi_stat_card(title, metrics, accent_color):
+    """Card containing multiple labeled metrics."""
+    return html.Div(className='stat-card', children=[
+        html.Div(style={'backgroundColor': accent_color}, className='accent-bar'),
+        html.Div(title, className='label', style={'marginBottom': '12px', 'fontWeight': '700', 'color': TEXT}),
+        html.Div(children=[
+            html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '6px'}, children=[
+                html.Span(m['label'], style={'color': MUTED, 'fontSize': '12px'}),
+                html.B(m['value'], style={'color': m.get('color', TEXT), 'fontSize': '14px'})
+            ]) for m in metrics
+        ])
+    ])
+
+
 def mask_email(e):
     if not isinstance(e, str) or '@' not in e:
         return e
@@ -59,45 +74,57 @@ def mask_email(e):
 
 # ── Charts ────────────────────────────────────────────────────
 def fig_funnel_bars():
-    """Grouped bar: Registrations vs Attendance by Source."""
-    src = M['source']
+    """Grouped bar: Registrations vs Attendance vs Booked by Source."""
+    s = M['source']
+    b = M['booked']
     sources = ['Organic', 'Paid']
-    regs = [src[s]['registered'] for s in sources]
-    atts = [src[s]['attended'] for s in sources]
-    rates = [f"{src[s]['show_rate']}%" for s in sources]
-    colors_reg = ['rgba(34,197,94,0.3)', 'rgba(245,158,11,0.3)']
-    colors_att = [GREEN, GOLD]
+    regs = [s[src]['registered'] for src in sources]
+    atts = [s[src]['attended'] for src in sources]
+    bkd = [b[src]['booked'] for src in sources]
+    
     fig = go.Figure()
-    fig.add_trace(go.Bar(name='Registered', x=sources, y=regs, marker_color=colors_reg,
-                         marker_line=dict(width=1, color=colors_att), text=regs, textposition='outside',
-                         textfont=dict(size=13, color=TEXT)))
-    fig.add_trace(go.Bar(name='Attended', x=sources, y=atts, marker_color=colors_att,
-                         text=[f"{a} ({r})" for a, r in zip(atts, rates)], textposition='outside',
-                         textfont=dict(size=12, color=TEXT)))
+    # Registrations (Faded)
+    fig.add_trace(go.Bar(name='Registered', x=sources, y=regs, 
+                         marker_color=['rgba(34,197,94,0.3)', 'rgba(245,158,11,0.3)'],
+                         marker_line=dict(width=1, color=[GREEN, GOLD]), text=regs, textposition='outside'))
+    # Attendance (Solid)
+    fig.add_trace(go.Bar(name='Attended', x=sources, y=atts, 
+                         marker_color=[GREEN, GOLD], text=atts, textposition='outside'))
+    # Booked (Blue/Bright)
+    fig.add_trace(go.Bar(name='Booked', x=sources, y=bkd, 
+                         marker_color=BLUE, text=bkd, textposition='outside'))
+    
     fig.update_layout(**PLOT_LAYOUT)
-    fig.update_layout(barmode='group', title=None,
-                      yaxis_title='People', showlegend=True,
+    fig.update_layout(barmode='group', title=None, yaxis_title='People', 
                       legend=dict(orientation='h', y=-0.15, x=0.5, xanchor='center'))
     fig.update_yaxes(range=[0, max(regs) * 1.25])
     return fig
 
 
-def fig_reg_donut():
-    """Donut: Registration split by source."""
-    src = M['source']
+def fig_source_donuts():
+    """Dual donuts for source split: Registration vs Booking."""
+    s = M['source']
+    b = M['booked']
     labels = ['Organic', 'Paid']
-    values = [src[s]['registered'] for s in labels]
     colors = [GREEN, GOLD]
-    fig = go.Figure(go.Pie(
-        labels=labels, values=values, hole=0.65,
-        marker=dict(colors=colors, line=dict(color=BG, width=2)),
-        textinfo='label+value', textposition='outside',
-        textfont=dict(size=12, color=TEXT),
-        hoverinfo='label+value+percent',
-    ))
+    
+    from plotly.subplots import make_subplots
+    fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'domain'}, {'type': 'domain'}]],
+                        subplot_titles=['REGISTRATION SPLIT', 'BOOKING SPLIT'])
+    
+    # Donut 1: Registrations
+    fig.add_trace(go.Pie(labels=labels, values=[s[src]['registered'] for src in labels], 
+                         marker=dict(colors=colors, line=dict(color=BG, width=2)),
+                         hole=0.6, name='Regs', textinfo='percent+value'), 1, 1)
+    
+    # Donut 2: Booked Calls
+    fig.add_trace(go.Pie(labels=labels, values=[b[src]['booked'] for src in labels], 
+                         marker=dict(colors=colors, line=dict(color=BG, width=2)),
+                         hole=0.6, name='Booked', textinfo='percent+value'), 1, 2)
+    
     fig.update_layout(**PLOT_LAYOUT)
-    fig.add_annotation(text=f"<b>{M['funnel']['total_registered']}</b><br><span style='font-size:11px;color:{MUTED}'>Total</span>",
-                       showarrow=False, font=dict(size=28, color=TEXT), x=0.5, y=0.5)
+    fig.update_layout(showlegend=True, legend=dict(orientation='h', y=-0.1, x=0.5, xanchor='center'))
+    fig.update_annotations(font=dict(size=11, color=MUTED))
     return fig
 
 
@@ -157,24 +184,25 @@ def fig_engagement():
 
 
 def fig_timeline():
-    """Area chart: Registration timeline by source."""
+    """Area chart: Event velocity over time."""
     tl = M['timeline']
-    if tl.empty:
-        return go.Figure().update_layout(**PLOT_LAYOUT)
+    if tl.empty: return go.Figure().update_layout(**PLOT_LAYOUT)
+    
     fig = go.Figure()
-    for src, color in [('Organic', GREEN), ('Paid', GOLD)]:
-        if src in tl.columns:
-            fig.add_trace(go.Scatter(
-                x=tl['reg_date'], y=tl[src], name=src, mode='lines',
-                line=dict(color=color, width=2),
-                fill='tozeroy', fillcolor=color.replace(')', ',0.1)').replace('rgb', 'rgba') if 'rgb' in color else f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.1)",
-            ))
+    # Total Registrations (Combined Area)
+    total_reg = tl['Organic_reg'] + tl['Paid_reg']
+    fig.add_trace(go.Scatter(x=tl['date'], y=total_reg, name='Daily Registrations', 
+                             fill='tozeroy', line=dict(color=GOLD, width=1, dash='dash')))
+    
+    # Booked Calls (Blue Dots)
+    total_booked = tl['Organic_booked'] + tl['Paid_booked']
+    fig.add_trace(go.Scatter(x=tl['date'], y=total_booked, name='Daily Booked Calls',
+                             mode='lines+markers', line=dict(color=BLUE, width=3),
+                             marker=dict(size=8, symbol='diamond')))
+    
     fig.update_layout(**PLOT_LAYOUT)
-    fig.update_layout(title=None,
-                      xaxis_title='Registration Date', yaxis_title='Registrations',
-                      legend=dict(orientation='h', y=-0.2, x=0.5, xanchor='center'),
-                      hovermode='x unified')
-    fig.update_xaxes(tickformat='%b %d')
+    fig.update_layout(title=None, xaxis_title='Date', yaxis_title='Events',
+                      legend=dict(orientation='h', y=-0.2, x=0.5, xanchor='center'), hovermode='x unified')
     return fig
 
 
@@ -196,7 +224,7 @@ def serve_screenshots(path):
     return flask.send_from_directory(bc_dir, path)
 
 # Prepare table data
-table_df = master[['name', 'email', 'source', 'attended', 'duration_minutes', 'engagement_pct', 'ad_platform', 'booked_call']].copy()
+table_df = master[['name', 'email', 'source', 'attended', 'duration_minutes', 'engagement_pct', 'ad_platform', 'booked_call', 'reg_status']].copy()
 table_df['email_masked'] = table_df['email'].apply(mask_email)
 table_df['attended_label'] = table_df['attended'].map({True: '✅ YES', False: '❌ NO'})
 table_df['duration_minutes'] = table_df['duration_minutes'].round(1)
@@ -235,16 +263,23 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
     html.Div(className='header-bar', children=[
         html.Div(className='header-left', children=[
             html.H1(['BJK ', html.Span('University')]),
-            html.P('Webinar Performance Analytics Dashboard'),
+            html.P(metadata.get('topic', 'A 30-Day Path to Becoming an AI Business Strategist Business Actually Pay For'), id='webinar-title'),
         ]),
         html.Div(className='header-right', children=[
-            html.Span('Wednesday, April 1, 2026'),
-            html.Span('|'),
-            html.Span(f'Generated {now}'),
-            html.Span('|'),
-            html.Span(className='live-dot'),
-            html.Span('LIVE', style={'color': GREEN, 'fontWeight': 600}),
-        ]),
+            html.Div(style={'display': 'flex', 'gap': '20px', 'marginRight': '30px'}, children=[
+                html.Div([html.Span('ID: ', style={'color': MUTED}), html.B(metadata.get('webinar_id', '834 7866 4154'))], style={'fontSize': '12px'}),
+                html.Div([html.Span('Regs: ', style={'color': MUTED}), html.B(f"{metadata.get('total_registrants_header', 944)}")], style={'fontSize': '12px'}),
+                html.Div([html.Span('Cancelled: ', style={'color': MUTED}), html.B(f"{metadata.get('cancelled_count', 4)}")], style={'fontSize': '12px'}),
+                html.Div([html.Span('Viewers: ', style={'color': MUTED}), html.B(f"{M['unique_viewers']}")], style={'fontSize': '12px'}),
+                html.Div([html.Span('Peak: ', style={'color': MUTED}), html.B(f"{M['max_concurrent']}")], style={'fontSize': '12px'}),
+            ]),
+            html.Span([metadata.get('scheduled_time', 'Apr 1, 2026 2:38 PM')], style={'marginRight': '20px', 'color': 'rgba(255,255,255,0.6)'}),
+            html.Span(['Generated ', datetime.now().strftime('%b %d, %y at %I:%M %p')], style={'marginRight': '20px', 'color': 'rgba(255,255,255,0.4)'}),
+            html.Div(className='live-indicator', children=[
+                html.Div(className='pulse'),
+                html.Span('LIVE')
+            ])
+        ])
     ]),
 
     # ── MAIN CONTENT ──────────────────────────────────────────
@@ -280,12 +315,15 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
         dbc.Row([
             dbc.Col(stat_card('Total Booked Calls', f"{b['total_booked']:,}", TEXT,
                               f"{b['booking_rate']}% total rate"), md=3),
-            dbc.Col(stat_card('Organic Booked', f"{b['Organic']['booked']:,}", GREEN,
-                              f"{b['Organic']['share']}% of bookings"), md=3),
-            dbc.Col(stat_card('Paid Booked', f"{b['Paid']['booked']:,}", GOLD,
-                              f"{b['Paid']['share']}% of bookings"), md=3),
-            dbc.Col(stat_card('Booking Rate', f"{b['booking_rate']}%", BLUE,
-                              "Conversion from attendee"), md=3),
+            dbc.Col(multi_stat_card('BOOKING SOURCE', [
+                {'label': 'Organic Booked', 'value': f"{b['Organic']['booked']:,}", 'color': GREEN},
+                {'label': 'Paid Booked', 'value': f"{b['Paid']['booked']:,}", 'color': GOLD},
+            ], BLUE), md=4),
+            dbc.Col(multi_stat_card('BOOKING BEHAVIOR', [
+                {'label': 'Attended & Booked', 'value': f"{b['att_booked']:,}", 'color': TEXT},
+                {'label': 'No-Show & Booked', 'value': f"{b['noshow_booked']:,}", 'color': MUTED},
+                {'label': 'Direct Booked', 'value': f"{b['direct_booked']:,}", 'color': BLUE},
+            ], BLUE), md=5),
         ], className='g-3 mb-3'),
 
         html.Div('Performance Efficiency', className='section-label'),
@@ -314,18 +352,23 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
         ]),
 
         # Section: Funnel Analysis
-        html.Div('Funnel Analysis', className='section-label'),
+        html.Div('Full Funnel Analysis', className='section-label'),
         dbc.Row([
             dbc.Col(html.Div(className='chart-card', children=[
-                html.H3(['Registrations vs Attendance ', html.Span('by Source')]),
+                html.H3(['Source Funnel ', html.Span('Regs vs Attendance vs Booked')]),
                 dcc.Graph(figure=fig_funnel_bars(), config={'displayModeBar': False},
                           style={'height': '380px'}),
-            ]), md=7),
+            ]), md=4),
             dbc.Col(html.Div(className='chart-card', children=[
-                html.H3(['Registration Split ', html.Span('by Source')]),
-                dcc.Graph(figure=fig_reg_donut(), config={'displayModeBar': False},
+                html.H3(['Source Velocity ', html.Span('Historical Progression')]),
+                dcc.Graph(figure=fig_timeline(), config={'displayModeBar': False},
                           style={'height': '380px'}),
-            ]), md=5),
+            ]), md=4),
+            dbc.Col(html.Div(className='chart-card', children=[
+                html.H3(['Source Split Breakdown ', html.Span('Market Share')]),
+                dcc.Graph(figure=fig_source_donuts(), config={'displayModeBar': False},
+                          style={'height': '380px'}),
+            ]), md=4),
         ], className='g-3 mb-4'),
 
         # Section: Show-Up Analysis
@@ -367,6 +410,7 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
                 columns=[
                     {'name': 'Name', 'id': 'name'},
                     {'name': 'Email', 'id': 'email_masked'},
+                    {'name': 'Status', 'id': 'reg_status'},
                     {'name': 'Source', 'id': 'source'},
                     {'name': 'Attended', 'id': 'attended_label'},
                     {'name': 'Duration (min)', 'id': 'duration_minutes', 'type': 'numeric'},

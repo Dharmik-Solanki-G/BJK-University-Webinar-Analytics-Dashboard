@@ -102,11 +102,17 @@ def load_webinar_registrants():
     with open(fp, 'r', encoding='utf-8', errors='replace') as f:
         lines = f.readlines()
     if len(lines) > 3:
-        parts = lines[3].split(',')
-        metadata['topic'] = parts[0].strip() if parts else ''
-        metadata['scheduled_time'] = parts[2].strip().strip('"') if len(parts) > 2 else ''
-        metadata['scheduled_duration'] = int(parts[3].strip()) if len(parts) > 3 and parts[3].strip().isdigit() else 90
-        metadata['total_registrants_header'] = int(parts[4].strip()) if len(parts) > 4 and parts[4].strip().isdigit() else 0
+        # Use regex to split while keeping quoted strings intact
+        parts = re.findall(r'("(?:[^"]|"")*"|[^,]+|(?<=,)(?=,))', lines[3])
+        parts = [p.strip().strip('"') for p in parts]
+        
+        topic = parts[0] if parts else ''
+        metadata['topic'] = topic
+        metadata['webinar_id'] = parts[1] if len(parts) > 1 else ''
+        metadata['scheduled_time'] = parts[2] if len(parts) > 2 else ''
+        metadata['scheduled_duration'] = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 90
+        metadata['total_registrants_header'] = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 0
+        metadata['cancelled_count'] = int(parts[5]) if len(parts) > 5 and parts[5].isdigit() else 0
     # Data starts after line 5 ("Attendee Details,") — header on line 6
     df = _read_csv_skip(fp, 5)
     df = _normalize_columns(df)
@@ -131,12 +137,28 @@ def load_webinar_attendees():
         lines = f.readlines()
     # Parse metadata from line 4 (0-indexed 3)
     if len(lines) > 3:
-        parts = lines[3].split(',')
-        metadata['actual_start'] = parts[2].strip().strip('"') if len(parts) > 2 else ''
-        metadata['actual_duration'] = int(parts[3].strip()) if len(parts) > 3 and parts[3].strip().isdigit() else 209
-        metadata['unique_viewers'] = int(parts[6].strip()) if len(parts) > 6 and parts[6].strip().isdigit() else 0
-        metadata['total_users'] = int(parts[7].strip()) if len(parts) > 7 and parts[7].strip().isdigit() else 0
-        metadata['max_concurrent'] = int(parts[8].strip()) if len(parts) > 8 and parts[8].strip().isdigit() else 0
+        parts = []
+        # Use regex to split while keeping quoted strings intact (for Topic which might contain commas)
+        parts = re.findall(r'("(?:[^"]|"")*"|[^,]+|(?<=,)(?=,))', lines[3])
+        parts = [p.strip().strip('"') for p in parts]
+        
+        # Metadata Indices for Attendee Report: 0:Topic, 1:ID, 2:Start, 3:Duration, 4:Regs, 5:Cancelled, 6:Unique, 7:Total, 8:Max
+        if len(parts) > 8:
+            metadata['actual_start'] = parts[2]
+            metadata['actual_duration'] = int(parts[3]) if parts[3].isdigit() else 209
+            metadata['total_registrants_header'] = int(parts[4]) if parts[4].isdigit() else 0
+            metadata['cancelled_count'] = int(parts[5]) if parts[5].isdigit() else 0
+            metadata['unique_viewers'] = int(parts[6]) if parts[6].isdigit() else 0
+            metadata['total_users'] = int(parts[7]) if parts[7].isdigit() else 0
+            metadata['max_concurrent'] = int(parts[8]) if parts[8].isdigit() else 0
+        else:
+            # Fallback to simple split if regex fails or structure is simpler
+            parts = lines[3].split(',')
+            metadata['actual_start'] = parts[2].strip().strip('"') if len(parts) > 2 else ''
+            metadata['actual_duration'] = int(parts[3].strip()) if len(parts) > 3 and parts[3].strip().isdigit() else 209
+            metadata['unique_viewers'] = int(parts[6].strip()) if len(parts) > 6 and parts[6].strip().isdigit() else 0
+            metadata['total_users'] = int(parts[7].strip()) if len(parts) > 7 and parts[7].strip().isdigit() else 0
+            metadata['max_concurrent'] = int(parts[8].strip()) if len(parts) > 8 and parts[8].strip().isdigit() else 0
     # Find "Attendee Details" section
     att_line = None
     for i, line in enumerate(lines):

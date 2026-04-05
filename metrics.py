@@ -77,27 +77,45 @@ def engagement_distribution(master):
 
 
 def registration_timeline(master):
-    """Group registrations by date, split by source."""
-    if 'registration_time' not in master.columns or master['registration_time'].isna().all():
-        return pd.DataFrame()
-    df = master.dropna(subset=['registration_time']).copy()
-    df['reg_date'] = df['registration_time'].dt.date
-    pivot = df.groupby(['reg_date', 'source']).size().unstack(fill_value=0)
-    for src in ['Organic', 'Paid']:
-        if src not in pivot.columns:
-            pivot[src] = 0
-    pivot = pivot.reset_index()
-    pivot['reg_date'] = pd.to_datetime(pivot['reg_date'])
-    return pivot.sort_values('reg_date')
+    """Group events by date, split by source."""
+    # Registrations Timeline
+    reg_df = master.dropna(subset=['registration_time']).copy()
+    reg_df['date'] = reg_df['registration_time'].dt.date
+    reg_pivot = reg_df.groupby(['date', 'source']).size().unstack(fill_value=0)
+    
+    # Booked Calls Timeline (using booking_date)
+    booked_df = master[master['booked_call'] == True].dropna(subset=['booking_date']).copy()
+    booked_pivot = booked_df.groupby(['booking_date', 'source']).size().unstack(fill_value=0)
+    
+    # Merge timelines
+    dates = sorted(list(set(reg_pivot.index) | set(booked_pivot.index)))
+    results = []
+    for d in dates:
+        row = {'date': pd.to_datetime(d)}
+        for src in ['Organic', 'Paid']:
+            row[f'{src}_reg'] = reg_pivot.loc[d, src] if (d in reg_pivot.index and src in reg_pivot.columns) else 0
+            row[f'{src}_booked'] = booked_pivot.loc[d, src] if (d in booked_pivot.index and src in booked_pivot.columns) else 0
+        results.append(row)
+    
+    return pd.DataFrame(results).sort_values('date')
 
 
 def booked_calls_metrics(master):
     """Booked call conversion metrics by source."""
     total_att = master['attended'].sum()
     total_booked = master['booked_call'].sum()
+
+    # Breakdown by behavior
+    att_booked = len(master[(master['booked_call']) & (master['reg_status'] == 'Attended')])
+    noshow_booked = len(master[(master['booked_call']) & (master['reg_status'] == 'No-Show')])
+    direct_booked = len(master[(master['booked_call']) & (master['reg_status'] == 'Booked Only')])
+
     results = {
         'total_booked': int(total_booked),
         'booking_rate': round(total_booked / total_att * 100, 1) if total_att > 0 else 0,
+        'att_booked': att_booked,
+        'noshow_booked': noshow_booked,
+        'direct_booked': direct_booked,
     }
     for src in ['Organic', 'Paid']:
         subset = master[master['source'] == src]
@@ -106,7 +124,10 @@ def booked_calls_metrics(master):
         results[src] = {
             'booked': int(booked_subset),
             'booking_rate': round(booked_subset / att_subset * 100, 1) if att_subset > 0 else 0,
-            'share': round(booked_subset / total_booked * 100, 1) if total_booked > 0 else 0
+            'share': round(booked_subset / total_booked * 100, 1) if total_booked > 0 else 0,
+            'att_booked': len(subset[(subset['booked_call']) & (subset['reg_status'] == 'Attended')]),
+            'noshow_booked': len(subset[(subset['booked_call']) & (subset['reg_status'] == 'No-Show')]),
+            'direct_booked': len(subset[(subset['booked_call']) & (subset['reg_status'] == 'Booked Only')]),
         }
     return results
 
