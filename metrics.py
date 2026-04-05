@@ -21,6 +21,8 @@ def funnel_metrics(master):
 
 def source_metrics(master):
     """Per-source breakdown of registration, attendance, show rate, engagement."""
+    total_reg = len(master)
+    total_att = master['attended'].sum()
     results = {}
     for src in ['Organic', 'Paid']:
         subset = master[master['source'] == src]
@@ -29,7 +31,9 @@ def source_metrics(master):
         att = len(attended)
         results[src] = {
             'registered': reg,
+            'reg_share': round(reg / total_reg * 100, 1) if total_reg > 0 else 0,
             'attended': att,
+            'att_share': round(att / total_att * 100, 1) if total_att > 0 else 0,
             'no_show': reg - att,
             'show_rate': round(att / reg * 100, 1) if reg > 0 else 0,
             'avg_engagement': round(attended['engagement_pct'].mean(), 1) if len(attended) > 0 else 0,
@@ -88,14 +92,23 @@ def registration_timeline(master):
 
 
 def booked_calls_metrics(master):
-    """Booked call conversion metrics."""
-    attended = master['attended'].sum()
-    booked_matched = master['booked_call'].sum()
-    return {
-        'total_booked': int(booked_matched),
-        'matched_booked': int(booked_matched),
-        'booking_rate': round(booked_matched / attended * 100, 1) if attended > 0 else 0,
+    """Booked call conversion metrics by source."""
+    total_att = master['attended'].sum()
+    total_booked = master['booked_call'].sum()
+    results = {
+        'total_booked': int(total_booked),
+        'booking_rate': round(total_booked / total_att * 100, 1) if total_att > 0 else 0,
     }
+    for src in ['Organic', 'Paid']:
+        subset = master[master['source'] == src]
+        att_subset = subset['attended'].sum()
+        booked_subset = subset['booked_call'].sum()
+        results[src] = {
+            'booked': int(booked_subset),
+            'booking_rate': round(booked_subset / att_subset * 100, 1) if att_subset > 0 else 0,
+            'share': round(booked_subset / total_booked * 100, 1) if total_booked > 0 else 0
+        }
+    return results
 
 
 def compute_all(master, metadata):
@@ -111,3 +124,4 @@ def compute_all(master, metadata):
         'unique_viewers': metadata.get('unique_viewers', 0),
         'max_concurrent': metadata.get('max_concurrent', 0),
     }
+

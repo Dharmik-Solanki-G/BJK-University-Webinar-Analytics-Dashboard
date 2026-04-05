@@ -251,32 +251,55 @@ app.layout = html.Div(style={'backgroundColor': BG, 'minHeight': '100vh'}, child
     html.Div(style={'padding': '24px 32px', 'maxWidth': '1440px', 'margin': '0 auto'}, children=[
 
         # Section: Key Metrics
-        html.Div('Key Performance Indicators', className='section-label'),
+        html.Div('Registrations Breakdown', className='section-label'),
         dbc.Row([
             dbc.Col(stat_card('Total Registered', f"{f['total_registered']:,}", TEXT,
-                              f"944 webinar signups"), md=True),
-            dbc.Col(stat_card('Total Attended', f"{f['total_attended']:,}", GOLD,
-                              f"{f['total_no_show']:,} no-shows"), md=True),
-            dbc.Col(stat_card('Show-Up Rate', f"{f['show_rate']}%", 
-                              GREEN if f['show_rate'] > 50 else GOLD if f['show_rate'] > 30 else '#EF4444',
-                              f"of all registrants"), md=True),
-            dbc.Col(stat_card('Organic Show Rate', f"{s['Organic']['show_rate']}%", GREEN,
-                              f"{s['Organic']['attended']} of {s['Organic']['registered']}"), md=True),
-            dbc.Col(stat_card('Paid Show Rate', f"{s['Paid']['show_rate']}%", GOLD,
-                              f"{s['Paid']['attended']} of {s['Paid']['registered']}"), md=True),
+                              "Total webinar signups"), md=3),
+            dbc.Col(stat_card('Organic Registrations', f"{s['Organic']['registered']:,}", GREEN,
+                              f"{s['Organic']['reg_share']}% of total"), md=3),
+            dbc.Col(stat_card('Paid Registrations', f"{s['Paid']['registered']:,}", GOLD,
+                              f"{s['Paid']['reg_share']}% of total"), md=3),
+            dbc.Col(stat_card('Peak Concurrent', f"{M['max_concurrent']}", BLUE,
+                              f"Max live viewers — {M['webinar_duration']} min"), md=3),
         ], className='g-3 mb-3'),
 
-        # Row 2: Extra stat cards
+        html.Div('Attendance Breakdown', className='section-label'),
         dbc.Row([
-            dbc.Col(stat_card('Booked Calls', f"{b['total_booked']}", BLUE,
-                              f"{b['booking_rate']}% of attendees"), md=3),
+            dbc.Col(stat_card('Total Attended', f"{f['total_attended']:,}", TEXT,
+                              f"{f['total_no_show']:,} no-shows"), md=3),
+            dbc.Col(stat_card('Organic Attendees', f"{s['Organic']['attended']:,}", GREEN,
+                              f"{s['Organic']['att_share']}% of attendees"), md=3),
+            dbc.Col(stat_card('Paid Attendees', f"{s['Paid']['attended']:,}", GOLD,
+                              f"{s['Paid']['att_share']}% of attendees"), md=3),
+            dbc.Col(stat_card('Show-Up Rate', f"{f['show_rate']}%", 
+                              GREEN if f['show_rate'] > 50 else GOLD if f['show_rate'] > 30 else '#EF4444',
+                              "Total attendance rate"), md=3),
+        ], className='g-3 mb-3'),
+
+        html.Div('Booked Calls Breakdown', className='section-label'),
+        dbc.Row([
+            dbc.Col(stat_card('Total Booked Calls', f"{b['total_booked']:,}", TEXT,
+                              f"{b['booking_rate']}% total rate"), md=3),
+            dbc.Col(stat_card('Organic Booked', f"{b['Organic']['booked']:,}", GREEN,
+                              f"{b['Organic']['share']}% of bookings"), md=3),
+            dbc.Col(stat_card('Paid Booked', f"{b['Paid']['booked']:,}", GOLD,
+                              f"{b['Paid']['share']}% of bookings"), md=3),
+            dbc.Col(stat_card('Booking Rate', f"{b['booking_rate']}%", BLUE,
+                              "Conversion from attendee"), md=3),
+        ], className='g-3 mb-3'),
+
+        html.Div('Performance Efficiency', className='section-label'),
+        dbc.Row([
             dbc.Col(stat_card('Avg Duration (Organic)', f"{s['Organic']['avg_duration']} min", GREEN,
                               f"{s['Organic']['avg_engagement']}% engagement"), md=3),
             dbc.Col(stat_card('Avg Duration (Paid)', f"{s['Paid']['avg_duration']} min", GOLD,
                               f"{s['Paid']['avg_engagement']}% engagement"), md=3),
-            dbc.Col(stat_card('Peak Concurrent', f"{M['max_concurrent']}", BLUE,
-                              f"per Zoom report — {M['webinar_duration']} min runtime"), md=3),
+            dbc.Col(stat_card('Organic Show Rate', f"{s['Organic']['show_rate']}%", GREEN,
+                              "Organic signup to show"), md=3),
+            dbc.Col(stat_card('Paid Show Rate', f"{s['Paid']['show_rate']}%", GOLD,
+                              "Paid signup to show"), md=3),
         ], className='g-3 mb-4'),
+
 
         html.Div(className='insight-bar', children=[
             html.Span("KEY INSIGHT  ", style={
